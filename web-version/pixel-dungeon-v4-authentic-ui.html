@@ -1,0 +1,1584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>像素地牢 - 完整版 V4</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            max-width: 960px;
+            height: 100vh;
+            max-height: 640px;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            border: 2px solid #333;
+        }
+
+        /* 顶部状态面板 - StatusPane (32px height) */
+        #statusPane {
+            height: 32px;
+            background: #7B8073;
+            position: relative;
+            display: flex;
+            align-items: center;
+            border-bottom: 2px solid #000;
+            flex-shrink: 0;
+        }
+
+        #heroAvatar {
+            width: 30px;
+            height: 30px;
+            margin-left: 1px;
+            margin-top: 1px;
+            background: linear-gradient(135deg, #4af 0%, #28f 100%);
+            border: 1px solid #000;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #heroLevel {
+            position: absolute;
+            font-size: 14px;
+            font-weight: bold;
+            color: #FFEBA4;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        #barsContainer {
+            flex: 1;
+            margin-left: 2px;
+            margin-right: 60px;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .statusBar {
+            height: 14px;
+            position: relative;
+        }
+
+        .statusBarBg {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+        }
+
+        .statusBarFill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            transition: width 0.3s;
+        }
+
+        #hpBarFill {
+            background: linear-gradient(to bottom, #cc0000 0%, #aa0000 100%);
+        }
+
+        #expBarFill {
+            background: linear-gradient(to bottom, #00cc00 0%, #00aa00 100%);
+        }
+
+        #depthInfo {
+            position: absolute;
+            right: 40px;
+            top: 6px;
+            font-size: 12px;
+            color: #CACFC2;
+            font-weight: bold;
+        }
+
+        #keysInfo {
+            position: absolute;
+            right: 60px;
+            top: 6px;
+            font-size: 12px;
+            color: #CACFC2;
+        }
+
+        #menuButton {
+            position: absolute;
+            right: 1px;
+            top: 1px;
+            width: 16px;
+            height: 16px;
+            background: #555;
+            border: 1px solid #000;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+
+        #menuButton:hover {
+            background: #777;
+        }
+
+        /* 游戏画布区域 */
+        #gameArea {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #gameCanvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            image-rendering: pixelated;
+        }
+
+        /* 底部工具栏 - Toolbar (25px height) */
+        #toolbar {
+            height: 25px;
+            background: #7B8073;
+            display: flex;
+            align-items: stretch;
+            border-top: 2px solid #000;
+            flex-shrink: 0;
+        }
+
+        .toolButton {
+            background: #555;
+            border: 1px solid #000;
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            transition: all 0.1s;
+            position: relative;
+        }
+
+        .toolButton:hover {
+            background: #777;
+            filter: brightness(1.4);
+        }
+
+        .toolButton:active {
+            filter: brightness(0.8);
+        }
+
+        .toolButton.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(0.7);
+        }
+
+        #btnWait { width: 20px; }
+        #btnSearch { width: 20px; }
+        #btnInfo { width: 21px; }
+        #btnInventory { width: 23px; margin-left: auto; }
+        #btnQuick1 { width: 22px; }
+        #btnQuick2 { width: 22px; display: none; }
+
+        .quickslotItem {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .quickslotEmpty::after {
+            content: '·';
+            font-size: 20px;
+            color: #333;
+        }
+
+        /* 消息日志 */
+        #messageLog {
+            position: absolute;
+            bottom: 35px;
+            left: 10px;
+            right: 10px;
+            max-height: 100px;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .message {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 4px 8px;
+            margin-bottom: 2px;
+            font-size: 12px;
+            border-left: 2px solid #444;
+            animation: fadeIn 0.3s;
+        }
+
+        .message.warning { border-left-color: #ff0; }
+        .message.danger { border-left-color: #f00; }
+        .message.good { border-left-color: #0f0; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 背包窗口 */
+        #inventoryWindow {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #2a2a2a;
+            border: 3px solid #555;
+            padding: 10px;
+            min-width: 300px;
+            max-width: 400px;
+            max-height: 400px;
+            z-index: 100;
+        }
+
+        #inventoryWindow.visible {
+            display: block;
+        }
+
+        #inventoryTitle {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #555;
+        }
+
+        #inventoryItems {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .inventoryItem {
+            padding: 8px;
+            margin: 4px 0;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .inventoryItem:hover {
+            background: #333;
+            border-color: #666;
+        }
+
+        .itemIcon {
+            width: 16px;
+            height: 16px;
+            background: #ffd700;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        #inventoryClose {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 20px;
+            height: 20px;
+            background: #555;
+            border: 1px solid #000;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        #inventoryClose:hover {
+            background: #777;
+        }
+
+        /* Gold indicator */
+        #goldIndicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            font-size: 8px;
+            color: #ffd700;
+            font-weight: bold;
+            text-shadow: 1px 1px 0 #000;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- 顶部状态面板 -->
+        <div id="statusPane">
+            <div id="heroAvatar">
+                <div id="heroLevel">1</div>
+            </div>
+            <div id="barsContainer">
+                <div class="statusBar">
+                    <div class="statusBarBg"></div>
+                    <div class="statusBarFill" id="hpBarFill" style="width: 100%"></div>
+                </div>
+                <div class="statusBar">
+                    <div class="statusBarBg"></div>
+                    <div class="statusBarFill" id="expBarFill" style="width: 0%"></div>
+                </div>
+            </div>
+            <div id="depthInfo">深度: <span id="depthValue">1</span></div>
+            <div id="keysInfo">🔑 <span id="keysValue">0</span></div>
+            <div id="menuButton" title="菜单">☰</div>
+        </div>
+
+        <!-- 游戏画布区域 -->
+        <div id="gameArea">
+            <canvas id="gameCanvas"></canvas>
+            <div id="messageLog"></div>
+        </div>
+
+        <!-- 底部工具栏 -->
+        <div id="toolbar">
+            <div class="toolButton" id="btnWait" title="等待 (Space)">⏸</div>
+            <div class="toolButton" id="btnSearch" title="搜索 (S)">🔍</div>
+            <div class="toolButton" id="btnInfo" title="检查 (X)">❓</div>
+            <div class="toolButton" id="btnInventory" title="背包 (I)">
+                🎒
+                <div id="goldIndicator">0</div>
+            </div>
+            <div class="toolButton" id="btnQuick2" title="快捷栏2 (2)">
+                <div class="quickslotItem quickslotEmpty" id="quick2Slot"></div>
+            </div>
+            <div class="toolButton" id="btnQuick1" title="快捷栏1 (1)">
+                <div class="quickslotItem quickslotEmpty" id="quick1Slot"></div>
+            </div>
+        </div>
+
+        <!-- 背包窗口 -->
+        <div id="inventoryWindow">
+            <div id="inventoryTitle">背包</div>
+            <div id="inventoryClose">×</div>
+            <div id="inventoryItems"></div>
+        </div>
+    </div>
+
+    <script>
+// ============================================================================
+// V4 完整版 - 保留V3所有游戏机制 + 原版UI布局
+// ============================================================================
+
+// ============================================================================
+// 工具类
+// ============================================================================
+class Random {
+    static seed = Date.now();
+
+    static setSeed(seed) {
+        this.seed = seed;
+    }
+
+    static float() {
+        this.seed = (this.seed * 9301 + 49297) % 233280;
+        return this.seed / 233280;
+    }
+
+    static int(max) {
+        return Math.floor(this.float() * max);
+    }
+
+    static intRange(min, max) {
+        return min + this.int(max - min + 1);
+    }
+
+    static chances(chances) {
+        let sum = 0;
+        for (let i = 0; i < chances.length; i++) {
+            sum += chances[i];
+        }
+        const value = this.float() * sum;
+        let curSum = 0;
+        for (let i = 0; i < chances.length; i++) {
+            curSum += chances[i];
+            if (value < curSum) {
+                return i;
+            }
+        }
+        return chances.length - 1;
+    }
+}
+
+class Utils {
+    static distance(x1, y1, x2, y2) {
+        return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+    }
+
+    static adjacent(x1, y1, x2, y2) {
+        return Math.abs(x1 - x2) + Math.abs(y1 - y2) === 1;
+    }
+}
+
+// ============================================================================
+// 地图生成 - BSP算法
+// ============================================================================
+class Room {
+    constructor(left, top, right, bottom) {
+        this.left = left;
+        this.top = top;
+        this.right = right;
+        this.bottom = bottom;
+    }
+
+    width() { return this.right - this.left; }
+    height() { return this.bottom - this.top; }
+    square() { return this.width() * this.height(); }
+
+    center() {
+        return {
+            x: Math.floor((this.left + this.right) / 2),
+            y: Math.floor((this.top + this.bottom) / 2)
+        };
+    }
+}
+
+class BSPMapGenerator {
+    constructor(width, height) {
+        this.width = width;
+        this.height = height;
+        this.minRoomSize = 7;
+        this.maxRoomSize = 9;
+        this.rooms = [];
+    }
+
+    generate() {
+        this.rooms = [];
+        const root = new Room(0, 0, this.width, this.height);
+        this.split(root);
+
+        if (this.rooms.length < 8) {
+            return this.generate();
+        }
+
+        return this.rooms;
+    }
+
+    split(rect) {
+        const w = rect.width();
+        const h = rect.height();
+
+        if (w > this.maxRoomSize && h < this.minRoomSize) {
+            const vw = Random.intRange(rect.left + 3, rect.right - 3);
+            this.split(new Room(rect.left, rect.top, vw, rect.bottom));
+            this.split(new Room(vw, rect.top, rect.right, rect.bottom));
+        } else if (h > this.maxRoomSize && w < this.minRoomSize) {
+            const vh = Random.intRange(rect.top + 3, rect.bottom - 3);
+            this.split(new Room(rect.left, rect.top, rect.right, vh));
+            this.split(new Room(rect.left, vh, rect.right, rect.bottom));
+        } else if ((Random.float() <= (this.minRoomSize * this.minRoomSize / rect.square()) &&
+                   w <= this.maxRoomSize && h <= this.maxRoomSize) ||
+                  w < this.minRoomSize || h < this.minRoomSize) {
+            this.rooms.push(rect);
+        } else {
+            if (Random.float() < (w - 2) / (w + h - 4)) {
+                const vw = Random.intRange(rect.left + 3, rect.right - 3);
+                this.split(new Room(rect.left, rect.top, vw, rect.bottom));
+                this.split(new Room(vw, rect.top, rect.right, rect.bottom));
+            } else {
+                const vh = Random.intRange(rect.top + 3, rect.bottom - 3);
+                this.split(new Room(rect.left, rect.top, rect.right, vh));
+                this.split(new Room(rect.left, vh, rect.right, rect.bottom));
+            }
+        }
+    }
+}
+
+// ============================================================================
+// 地图类
+// ============================================================================
+const TERRAIN = {
+    WALL: 0,
+    WALL_TOP: 1,
+    FLOOR: 2,
+    DOOR: 3,
+    ENTRANCE: 4,
+    EXIT: 5,
+    GRASS: 6,
+    HIGH_GRASS: 7,
+    WATER: 8
+};
+
+class Cell {
+    constructor(terrain) {
+        this.terrain = terrain;
+        this.discovered = false;
+        this.visible = false;
+    }
+}
+
+class GameMap {
+    constructor(width, height, depth) {
+        this.width = width;
+        this.height = height;
+        this.depth = depth;
+        this.cells = [];
+        this.rooms = [];
+        this.entrance = null;
+        this.exit = null;
+
+        for (let y = 0; y < height; y++) {
+            this.cells[y] = [];
+            for (let x = 0; x < width; x++) {
+                this.cells[y][x] = new Cell(TERRAIN.WALL);
+            }
+        }
+    }
+
+    generate() {
+        const generator = new BSPMapGenerator(this.width, this.height);
+        this.rooms = generator.generate();
+
+        this.rooms.forEach(room => {
+            for (let y = room.top; y < room.bottom; y++) {
+                for (let x = room.left; x < room.right; x++) {
+                    this.cells[y][x].terrain = TERRAIN.FLOOR;
+                }
+            }
+        });
+
+        this.connectRooms();
+        this.placeEntranceAndExit();
+        this.addWallTops();
+        this.decorateMap();
+    }
+
+    connectRooms() {
+        for (let i = 0; i < this.rooms.length - 1; i++) {
+            const room1 = this.rooms[i];
+            const room2 = this.rooms[i + 1];
+            const c1 = room1.center();
+            const c2 = room2.center();
+
+            if (Random.float() < 0.5) {
+                this.hCorridor(c1.x, c2.x, c1.y);
+                this.vCorridor(c1.y, c2.y, c2.x);
+            } else {
+                this.vCorridor(c1.y, c2.y, c1.x);
+                this.hCorridor(c1.x, c2.x, c2.y);
+            }
+        }
+    }
+
+    hCorridor(x1, x2, y) {
+        for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+            if (this.isValid(x, y)) {
+                this.cells[y][x].terrain = TERRAIN.FLOOR;
+            }
+        }
+    }
+
+    vCorridor(y1, y2, x) {
+        for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+            if (this.isValid(x, y)) {
+                this.cells[y][x].terrain = TERRAIN.FLOOR;
+            }
+        }
+    }
+
+    placeEntranceAndExit() {
+        let entrance, exit;
+        let maxDist = 0;
+
+        for (let i = 0; i < this.rooms.length; i++) {
+            for (let j = i + 1; j < this.rooms.length; j++) {
+                const c1 = this.rooms[i].center();
+                const c2 = this.rooms[j].center();
+                const dist = Utils.distance(c1.x, c1.y, c2.x, c2.y);
+                if (dist > maxDist) {
+                    maxDist = dist;
+                    entrance = c1;
+                    exit = c2;
+                }
+            }
+        }
+
+        this.entrance = entrance;
+        this.exit = exit;
+        this.cells[entrance.y][entrance.x].terrain = TERRAIN.ENTRANCE;
+        this.cells[exit.y][exit.x].terrain = TERRAIN.EXIT;
+    }
+
+    addWallTops() {
+        for (let y = 0; y < this.height - 1; y++) {
+            for (let x = 0; x < this.width; x++) {
+                if (this.cells[y][x].terrain === TERRAIN.WALL &&
+                    this.cells[y + 1][x].terrain !== TERRAIN.WALL) {
+                    this.cells[y][x].terrain = TERRAIN.WALL_TOP;
+                }
+            }
+        }
+    }
+
+    decorateMap() {
+        this.rooms.forEach(room => {
+            if (Random.float() < 0.4) {
+                for (let y = room.top; y < room.bottom; y++) {
+                    for (let x = room.left; x < room.right; x++) {
+                        if (this.cells[y][x].terrain === TERRAIN.FLOOR && Random.float() < 0.2) {
+                            this.cells[y][x].terrain = Random.float() < 0.5 ? TERRAIN.GRASS : TERRAIN.HIGH_GRASS;
+                        }
+                    }
+                }
+            }
+
+            if (Random.float() < 0.15 && room.width() >= 5 && room.height() >= 5) {
+                const poolW = Random.intRange(2, 4);
+                const poolH = Random.intRange(2, 4);
+                const poolX = Random.intRange(room.left + 1, room.right - poolW - 1);
+                const poolY = Random.intRange(room.top + 1, room.bottom - poolH - 1);
+
+                for (let y = poolY; y < poolY + poolH; y++) {
+                    for (let x = poolX; x < poolX + poolW; x++) {
+                        this.cells[y][x].terrain = TERRAIN.WATER;
+                    }
+                }
+            }
+        });
+    }
+
+    isValid(x, y) {
+        return x >= 0 && x < this.width && y >= 0 && y < this.height;
+    }
+
+    isPassable(x, y) {
+        if (!this.isValid(x, y)) return false;
+        const t = this.cells[y][x].terrain;
+        return t === TERRAIN.FLOOR || t === TERRAIN.ENTRANCE || t === TERRAIN.EXIT ||
+               t === TERRAIN.GRASS || t === TERRAIN.HIGH_GRASS || t === TERRAIN.WATER;
+    }
+}
+
+// ============================================================================
+// 角色系统
+// ============================================================================
+const AI_STATE = {
+    SLEEPING: 0,
+    WANDERING: 1,
+    HUNTING: 2,
+    FLEEING: 3,
+    PASSIVE: 4
+};
+
+class Character {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.hp = 20;
+        this.maxHp = 20;
+        this.attack = 2;
+        this.defense = 0;
+        this.accuracy = 10;
+        this.evasion = 5;
+    }
+
+    static hit(attacker, defender) {
+        const accuracy = Random.int(attacker.accuracy + 1);
+        const evasion = Random.int(defender.evasion + 1);
+        return accuracy >= evasion;
+    }
+
+    damageRoll() {
+        return Random.intRange(this.attack, this.attack + 4);
+    }
+
+    drRoll() {
+        return Random.int(this.defense + 1);
+    }
+
+    attackTarget(target) {
+        if (Character.hit(this, target)) {
+            const dmg = this.damageRoll();
+            const dr = target.drRoll();
+            const effectiveDamage = Math.max(dmg - dr, 1);
+            target.hp -= effectiveDamage;
+            return { hit: true, damage: effectiveDamage };
+        }
+        return { hit: false };
+    }
+
+    isAlive() {
+        return this.hp > 0;
+    }
+}
+
+class Player extends Character {
+    constructor(x, y) {
+        super(x, y);
+        this.hp = 20;
+        this.maxHp = 20;
+        this.attack = 2;
+        this.defense = 0;
+        this.accuracy = 10;
+        this.evasion = 5;
+        this.level = 1;
+        this.exp = 0;
+        this.maxExp = 10;
+        this.gold = 0;
+        this.keys = 0;
+    }
+
+    gainExp(amount) {
+        this.exp += amount;
+        if (this.exp >= this.maxExp) {
+            this.levelUp();
+        }
+    }
+
+    levelUp() {
+        this.level++;
+        this.exp = 0;
+        this.maxExp = Math.floor(this.maxExp * 1.5);
+        this.maxHp += 5;
+        this.hp = this.maxHp;
+        this.attack += 1;
+        this.defense += 1;
+        this.accuracy += 2;
+        this.evasion += 1;
+        return true;
+    }
+}
+
+class Monster extends Character {
+    constructor(x, y, type, depth) {
+        super(x, y);
+        this.type = type;
+        this.depth = depth;
+        this.state = AI_STATE.SLEEPING;
+        this.name = type;
+
+        this.applyStats();
+    }
+
+    applyStats() {
+        const stats = {
+            'Rat': { hp: 8, atk: 3, def: 1, acc: 8, eva: 5, exp: 1 },
+            'Gnoll': { hp: 12, atk: 4, def: 2, acc: 10, eva: 4, exp: 2 },
+            'Crab': { hp: 15, atk: 5, def: 4, acc: 12, eva: 5, exp: 3 },
+            'Swarm': { hp: 10, atk: 4, def: 0, acc: 10, eva: 8, exp: 2 },
+            'Skeleton': { hp: 25, atk: 6, def: 5, acc: 12, eva: 5, exp: 4 },
+            'Thief': { hp: 20, atk: 5, def: 2, acc: 12, eva: 12, exp: 3 },
+            'Shaman': { hp: 18, atk: 7, def: 2, acc: 15, eva: 5, exp: 4 },
+            'Bat': { hp: 15, atk: 5, def: 1, acc: 15, eva: 8, exp: 3 },
+            'Brute': { hp: 40, atk: 8, def: 4, acc: 12, eva: 3, exp: 5 },
+            'Goo': { hp: 80, atk: 10, def: 2, acc: 15, eva: 5, exp: 20 }
+        };
+
+        const stat = stats[this.type] || stats['Rat'];
+        this.hp = this.maxHp = stat.hp;
+        this.attack = stat.atk;
+        this.defense = stat.def;
+        this.accuracy = stat.acc;
+        this.evasion = stat.eva;
+        this.expReward = stat.exp;
+    }
+
+    act(player, map) {
+        const dist = Utils.distance(this.x, this.y, player.x, player.y);
+        const canSee = dist <= CONFIG.VIEW_DISTANCE && map.cells[this.y][this.x].visible;
+
+        switch (this.state) {
+            case AI_STATE.SLEEPING:
+                if (canSee) {
+                    this.state = AI_STATE.HUNTING;
+                    game.addMessage(`${this.name} 注意到了你！`, 'warning');
+                }
+                break;
+
+            case AI_STATE.HUNTING:
+                if (Utils.adjacent(this.x, this.y, player.x, player.y)) {
+                    const result = this.attackTarget(player);
+                    if (result.hit) {
+                        game.addMessage(`${this.name} 攻击你造成 ${result.damage} 点伤害！`, 'danger');
+                    } else {
+                        game.addMessage(`${this.name} 的攻击被你闪避了！`);
+                    }
+                } else if (canSee) {
+                    this.moveTowards(player.x, player.y, map);
+                } else {
+                    this.state = AI_STATE.WANDERING;
+                }
+                break;
+
+            case AI_STATE.WANDERING:
+                if (canSee) {
+                    this.state = AI_STATE.HUNTING;
+                } else if (Random.float() < 0.3) {
+                    const dirs = [[0,1], [0,-1], [1,0], [-1,0]];
+                    const dir = dirs[Random.int(dirs.length)];
+                    const nx = this.x + dir[0];
+                    const ny = this.y + dir[1];
+                    if (map.isPassable(nx, ny)) {
+                        this.x = nx;
+                        this.y = ny;
+                    }
+                }
+                break;
+        }
+    }
+
+    moveTowards(targetX, targetY, map) {
+        const dx = targetX - this.x;
+        const dy = targetY - this.y;
+
+        let moveX = 0, moveY = 0;
+
+        if (Math.abs(dx) > Math.abs(dy)) {
+            moveX = dx > 0 ? 1 : -1;
+            if (!map.isPassable(this.x + moveX, this.y)) {
+                moveX = 0;
+                moveY = dy > 0 ? 1 : -1;
+            }
+        } else {
+            moveY = dy > 0 ? 1 : -1;
+            if (!map.isPassable(this.x, this.y + moveY)) {
+                moveY = 0;
+                moveX = dx > 0 ? 1 : -1;
+            }
+        }
+
+        const newX = this.x + moveX;
+        const newY = this.y + moveY;
+
+        if (map.isPassable(newX, newY)) {
+            this.x = newX;
+            this.y = newY;
+        }
+    }
+}
+
+// ============================================================================
+// Bestiary 怪物池系统
+// ============================================================================
+class Bestiary {
+    static MOB_CLASSES = {
+        'Rat': Monster,
+        'Gnoll': Monster,
+        'Crab': Monster,
+        'Swarm': Monster,
+        'Skeleton': Monster,
+        'Thief': Monster,
+        'Shaman': Monster,
+        'Bat': Monster,
+        'Brute': Monster,
+        'Goo': Monster
+    };
+
+    static getMob(depth) {
+        let chances, classes;
+
+        switch (depth) {
+            case 1:
+                chances = [1];
+                classes = ['Rat'];
+                break;
+            case 2:
+                chances = [1, 1];
+                classes = ['Rat', 'Gnoll'];
+                break;
+            case 3:
+                chances = [1, 2, 1, 0.02];
+                classes = ['Rat', 'Gnoll', 'Crab', 'Swarm'];
+                break;
+            case 4:
+                chances = [1, 2, 3, 0.02, 0.01, 0.01];
+                classes = ['Rat', 'Gnoll', 'Crab', 'Swarm', 'Skeleton', 'Thief'];
+                break;
+            case 5:
+                chances = [1];
+                classes = ['Goo'];
+                break;
+            case 6:
+                chances = [4, 2, 1, 0.2];
+                classes = ['Skeleton', 'Thief', 'Swarm', 'Shaman'];
+                break;
+            case 7:
+                chances = [3, 1, 1, 1];
+                classes = ['Skeleton', 'Shaman', 'Thief', 'Swarm'];
+                break;
+            case 8:
+                chances = [3, 2, 1, 1, 1, 0.02];
+                classes = ['Skeleton', 'Shaman', 'Gnoll', 'Thief', 'Swarm', 'Bat'];
+                break;
+            case 9:
+                chances = [3, 3, 1, 1, 0.02, 0.01];
+                classes = ['Skeleton', 'Shaman', 'Thief', 'Swarm', 'Bat', 'Brute'];
+                break;
+            default:
+                chances = [1];
+                classes = ['Rat'];
+        }
+
+        const index = Random.chances(chances);
+        const className = classes[index];
+        return { type: className, class: this.MOB_CLASSES[className] };
+    }
+
+    static mobCount(depth) {
+        return 2 + (depth % 5) + Random.int(3);
+    }
+}
+
+// ============================================================================
+// 物品系统
+// ============================================================================
+class Item {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.name = type === 'HealthPotion' ? '生命药水' : '物品';
+    }
+
+    use(player) {
+        if (this.type === 'HealthPotion') {
+            const healAmount = Math.min(10, player.maxHp - player.hp);
+            player.hp += healAmount;
+            game.addMessage(`你使用了生命药水，恢复了 ${healAmount} 点生命值`, 'good');
+            return true;
+        }
+        return false;
+    }
+}
+
+// ============================================================================
+// 渲染器
+// ============================================================================
+class Renderer {
+    constructor(canvas, tileSize) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.tileSize = tileSize;
+        this.time = 0;
+    }
+
+    render(map, player, monsters, items) {
+        this.time += 0.05;
+        const viewWidth = 32;
+        const viewHeight = 24;
+
+        this.canvas.width = viewWidth * this.tileSize;
+        this.canvas.height = viewHeight * this.tileSize;
+
+        const startX = Math.max(0, Math.min(player.x - Math.floor(viewWidth / 2), map.width - viewWidth));
+        const startY = Math.max(0, Math.min(player.y - Math.floor(viewHeight / 2), map.height - viewHeight));
+
+        for (let y = 0; y < viewHeight; y++) {
+            for (let x = 0; x < viewWidth; x++) {
+                const mapX = startX + x;
+                const mapY = startY + y;
+                if (map.isValid(mapX, mapY)) {
+                    const cell = map.cells[mapY][mapX];
+                    this.drawTile(x, y, cell);
+                }
+            }
+        }
+
+        items.forEach(item => {
+            const screenX = item.x - startX;
+            const screenY = item.y - startY;
+            if (screenX >= 0 && screenX < viewWidth && screenY >= 0 && screenY < viewHeight) {
+                if (map.cells[item.y][item.x].visible) {
+                    this.drawItem(screenX, screenY);
+                }
+            }
+        });
+
+        monsters.forEach(monster => {
+            const screenX = monster.x - startX;
+            const screenY = monster.y - startY;
+            if (screenX >= 0 && screenX < viewWidth && screenY >= 0 && screenY < viewHeight) {
+                if (map.cells[monster.y][monster.x].visible) {
+                    this.drawMonster(screenX, screenY, monster);
+                }
+            }
+        });
+
+        const playerScreenX = player.x - startX;
+        const playerScreenY = player.y - startY;
+        this.drawPlayer(playerScreenX, playerScreenY);
+    }
+
+    drawTile(x, y, cell) {
+        const px = x * this.tileSize;
+        const py = y * this.tileSize;
+        const s = this.tileSize;
+
+        if (!cell.discovered) {
+            this.ctx.fillStyle = '#000';
+            this.ctx.fillRect(px, py, s, s);
+            return;
+        }
+
+        const alpha = cell.visible ? 1.0 : 0.4;
+        this.ctx.globalAlpha = alpha;
+
+        switch (cell.terrain) {
+            case TERRAIN.WALL:
+                this.ctx.fillStyle = '#4a4a4a';
+                this.ctx.fillRect(px, py, s, s);
+                this.ctx.fillStyle = '#3a3a3a';
+                this.ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
+                break;
+
+            case TERRAIN.WALL_TOP:
+                this.ctx.fillStyle = '#6a6a6a';
+                this.ctx.fillRect(px, py, s, s);
+                this.ctx.fillStyle = '#5a5a5a';
+                this.ctx.fillRect(px + 1, py + 1, s - 2, s - 2);
+                break;
+
+            case TERRAIN.FLOOR:
+                this.ctx.fillStyle = '#3a3a3a';
+                this.ctx.fillRect(px, py, s, s);
+                if (Random.float() < 0.1) {
+                    this.ctx.fillStyle = '#444';
+                    this.ctx.fillRect(px + Random.int(s), py + Random.int(s), 1, 1);
+                }
+                break;
+
+            case TERRAIN.GRASS:
+                this.ctx.fillStyle = '#2a4a1a';
+                this.ctx.fillRect(px, py, s, s);
+                this.ctx.fillStyle = '#4a6a3a';
+                for (let i = 0; i < 3; i++) {
+                    this.ctx.fillRect(px + Random.int(s), py + Random.int(s), 1, 2);
+                }
+                break;
+
+            case TERRAIN.HIGH_GRASS:
+                this.ctx.fillStyle = '#1a3a0a';
+                this.ctx.fillRect(px, py, s, s);
+                this.ctx.fillStyle = '#3a5a2a';
+                for (let i = 0; i < 4; i++) {
+                    this.ctx.fillRect(px + Random.int(s), py + Random.int(s - 2), 2, 3);
+                }
+                break;
+
+            case TERRAIN.WATER:
+                const wave = Math.sin(this.time + x * 0.5 + y * 0.5) * 0.2 + 0.8;
+                this.ctx.fillStyle = '#1e90ff';
+                this.ctx.fillRect(px, py, s, s);
+                this.ctx.fillStyle = `rgba(100, 200, 255, ${wave})`;
+                this.ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
+                break;
+
+            case TERRAIN.ENTRANCE:
+                this.ctx.fillStyle = '#3a3a3a';
+                this.ctx.fillRect(px, py, s, s);
+                this.ctx.fillStyle = '#ffd700';
+                this.ctx.fillRect(px + 2, py + 4, s - 4, 2);
+                this.ctx.fillRect(px + 2, py + 8, s - 4, 2);
+                this.ctx.fillRect(px + 2, py + 12, s - 4, 2);
+                break;
+
+            case TERRAIN.EXIT:
+                this.ctx.fillStyle = '#3a3a3a';
+                this.ctx.fillRect(px, py, s, s);
+                this.ctx.fillStyle = '#ff4500';
+                this.ctx.fillRect(px + 2, py + 4, s - 4, 2);
+                this.ctx.fillRect(px + 2, py + 8, s - 4, 2);
+                this.ctx.fillRect(px + 2, py + 12, s - 4, 2);
+                break;
+        }
+
+        this.ctx.globalAlpha = 1.0;
+    }
+
+    drawPlayer(x, y) {
+        const px = x * this.tileSize;
+        const py = y * this.tileSize;
+        const s = this.tileSize;
+
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.beginPath();
+        this.ctx.ellipse(px + s/2, py + s - 2, s/3, s/6, 0, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = '#4af';
+        this.ctx.fillRect(px + s/4, py + s/3, s/2, s/2);
+
+        this.ctx.fillStyle = '#fdb';
+        this.ctx.fillRect(px + s/4, py + s/6, s/2, s/4);
+
+        this.ctx.fillStyle = '#ccc';
+        this.ctx.fillRect(px + s/3, py + s/2, s/6, s/3);
+    }
+
+    drawMonster(x, y, monster) {
+        const px = x * this.tileSize;
+        const py = y * this.tileSize;
+        const s = this.tileSize;
+
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.beginPath();
+        this.ctx.ellipse(px + s/2, py + s - 2, s/3, s/6, 0, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        const colors = {
+            'Rat': '#8b4513',
+            'Gnoll': '#d2691e',
+            'Crab': '#ff6347',
+            'Swarm': '#556b2f',
+            'Skeleton': '#f5f5dc',
+            'Thief': '#2f4f4f',
+            'Shaman': '#8b008b',
+            'Bat': '#4b0082',
+            'Brute': '#8b0000',
+            'Goo': '#a0f'
+        };
+
+        this.ctx.fillStyle = colors[monster.type] || '#666';
+        this.ctx.fillRect(px + s/4, py + s/4, s/2, s/2);
+
+        this.ctx.fillStyle = '#f00';
+        this.ctx.fillRect(px + s/3, py + s/3, 2, 2);
+        this.ctx.fillRect(px + s*2/3 - 2, py + s/3, 2, 2);
+
+        if (monster.hp < monster.maxHp) {
+            const healthPercent = monster.hp / monster.maxHp;
+            this.ctx.fillStyle = '#8b0000';
+            this.ctx.fillRect(px, py - 4, s, 3);
+            this.ctx.fillStyle = '#f00';
+            this.ctx.fillRect(px, py - 4, s * healthPercent, 3);
+        }
+    }
+
+    drawItem(x, y) {
+        const px = x * this.tileSize;
+        const py = y * this.tileSize;
+        const s = this.tileSize;
+
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.beginPath();
+        this.ctx.ellipse(px + s/2, py + s - 2, s/3, s/6, 0, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = '#ffd700';
+        this.ctx.beginPath();
+        this.ctx.arc(px + s/2, py + s/2, s/3, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = '#ff0';
+        this.ctx.fillRect(px + s/2 - 1, py + s/4, 2, s/2);
+        this.ctx.fillRect(px + s/4, py + s/2 - 1, s/2, 2);
+    }
+}
+
+// ============================================================================
+// 配置
+// ============================================================================
+const CONFIG = {
+    MAP_WIDTH: 48,
+    MAP_HEIGHT: 48,
+    TILE_SIZE: 16,
+    VIEW_DISTANCE: 5
+};
+
+// ============================================================================
+// 游戏类
+// ============================================================================
+class Game {
+    constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.renderer = new Renderer(this.canvas, CONFIG.TILE_SIZE);
+        this.depth = 1;
+        this.init();
+        this.setupControls();
+        this.gameLoop();
+    }
+
+    init() {
+        this.map = new GameMap(CONFIG.MAP_WIDTH, CONFIG.MAP_HEIGHT, this.depth);
+        this.map.generate();
+
+        this.player = new Player(this.map.entrance.x, this.map.entrance.y);
+
+        this.monsters = [];
+        this.spawnMonsters();
+
+        this.items = [];
+        this.spawnItems();
+
+        this.messages = [];
+        this.inventory = [];
+        this.quickSlot1 = null;
+        this.quickSlot2 = null;
+
+        this.updateFOV();
+        this.updateUI();
+
+        this.addMessage(`欢迎来到像素地牢第 ${this.depth} 层！`);
+    }
+
+    spawnMonsters() {
+        const count = Bestiary.mobCount(this.depth);
+        const rooms = this.map.rooms.filter(r => {
+            const c = r.center();
+            return c.x !== this.map.entrance.x || c.y !== this.map.entrance.y;
+        });
+
+        for (let i = 0; i < count; i++) {
+            const room = rooms[Random.int(rooms.length)];
+            let x, y;
+            do {
+                x = Random.intRange(room.left + 1, room.right - 1);
+                y = Random.intRange(room.top + 1, room.bottom - 1);
+            } while (!this.map.isPassable(x, y) || this.monsters.some(m => m.x === x && m.y === y));
+
+            const mobInfo = Bestiary.getMob(this.depth);
+            const monster = new mobInfo.class(x, y, mobInfo.type, this.depth);
+            this.monsters.push(monster);
+        }
+    }
+
+    spawnItems() {
+        let count = 3;
+        while (Random.float() < 0.4) {
+            count++;
+        }
+
+        for (let i = 0; i < count; i++) {
+            const room = this.map.rooms[Random.int(this.map.rooms.length)];
+            let x, y;
+            do {
+                x = Random.intRange(room.left + 1, room.right - 1);
+                y = Random.intRange(room.top + 1, room.bottom - 1);
+            } while (!this.map.isPassable(x, y) || this.items.some(item => item.x === x && item.y === y));
+
+            this.items.push(new Item(x, y, 'HealthPotion'));
+        }
+    }
+
+    updateFOV() {
+        for (let y = 0; y < this.map.height; y++) {
+            for (let x = 0; x < this.map.width; x++) {
+                this.map.cells[y][x].visible = false;
+            }
+        }
+
+        for (let dy = -CONFIG.VIEW_DISTANCE; dy <= CONFIG.VIEW_DISTANCE; dy++) {
+            for (let dx = -CONFIG.VIEW_DISTANCE; dx <= CONFIG.VIEW_DISTANCE; dx++) {
+                const x = this.player.x + dx;
+                const y = this.player.y + dy;
+                if (this.map.isValid(x, y)) {
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist <= CONFIG.VIEW_DISTANCE) {
+                        this.map.cells[y][x].visible = true;
+                        this.map.cells[y][x].discovered = true;
+                    }
+                }
+            }
+        }
+    }
+
+    movePlayer(dx, dy) {
+        const newX = this.player.x + dx;
+        const newY = this.player.y + dy;
+
+        if (!this.map.isPassable(newX, newY)) {
+            this.addMessage('前方无法通行！');
+            return false;
+        }
+
+        const monster = this.monsters.find(m => m.x === newX && m.y === newY && m.isAlive());
+        if (monster) {
+            const result = this.player.attackTarget(monster);
+            if (result.hit) {
+                this.addMessage(`你攻击 ${monster.name} 造成 ${result.damage} 点伤害！`, 'good');
+                if (!monster.isAlive()) {
+                    this.addMessage(`你击败了 ${monster.name}！`, 'good');
+                    this.player.gainExp(monster.expReward);
+                    if (Random.float() < 0.3) {
+                        this.items.push(new Item(monster.x, monster.y, 'HealthPotion'));
+                    }
+                }
+            } else {
+                this.addMessage(`你的攻击被 ${monster.name} 闪避了！`);
+            }
+            this.endTurn();
+            return true;
+        }
+
+        this.player.x = newX;
+        this.player.y = newY;
+
+        const cell = this.map.cells[newY][newX];
+        if (cell.terrain === TERRAIN.EXIT) {
+            this.nextLevel();
+            return true;
+        }
+
+        const item = this.items.find(i => i.x === newX && i.y === newY);
+        if (item) {
+            this.addMessage(`你捡起了 ${item.name}`, 'good');
+            this.inventory.push(item);
+            this.items = this.items.filter(i => i !== item);
+            if (this.inventory.length === 1) {
+                this.quickSlot1 = item;
+                this.updateQuickSlots();
+            }
+        }
+
+        this.endTurn();
+        return true;
+    }
+
+    endTurn() {
+        this.monsters.forEach(monster => {
+            if (monster.isAlive()) {
+                monster.act(this.player, this.map);
+            }
+        });
+
+        if (!this.player.isAlive()) {
+            this.gameOver();
+        }
+
+        this.updateFOV();
+        this.updateUI();
+    }
+
+    nextLevel() {
+        this.depth++;
+        this.addMessage(`你进入了第 ${this.depth} 层！`, 'good');
+        this.init();
+    }
+
+    gameOver() {
+        this.addMessage('你死了！游戏结束。', 'danger');
+        setTimeout(() => {
+            if (confirm('你死了！是否重新开始？')) {
+                this.depth = 1;
+                this.init();
+            }
+        }, 500);
+    }
+
+    useItem(item) {
+        if (item && item.use(this.player)) {
+            this.inventory = this.inventory.filter(i => i !== item);
+            if (this.quickSlot1 === item) this.quickSlot1 = null;
+            if (this.quickSlot2 === item) this.quickSlot2 = null;
+            this.updateQuickSlots();
+            this.updateInventoryUI();
+            this.endTurn();
+        }
+    }
+
+    updateQuickSlots() {
+        const slot1 = document.getElementById('quick1Slot');
+        const slot2 = document.getElementById('quick2Slot');
+
+        if (this.quickSlot1) {
+            slot1.textContent = '💊';
+            slot1.classList.remove('quickslotEmpty');
+        } else {
+            slot1.textContent = '';
+            slot1.classList.add('quickslotEmpty');
+        }
+
+        if (this.quickSlot2) {
+            slot2.textContent = '💊';
+            slot2.classList.remove('quickslotEmpty');
+            document.getElementById('btnQuick2').style.display = 'flex';
+        } else {
+            slot2.textContent = '';
+            slot2.classList.add('quickslotEmpty');
+            if (this.inventory.length < 2) {
+                document.getElementById('btnQuick2').style.display = 'none';
+            }
+        }
+    }
+
+    updateUI() {
+        document.getElementById('heroLevel').textContent = this.player.level;
+        document.getElementById('depthValue').textContent = this.depth;
+        document.getElementById('keysValue').textContent = this.player.keys;
+        document.getElementById('goldIndicator').textContent = this.player.gold;
+
+        const hpPercent = (this.player.hp / this.player.maxHp) * 100;
+        document.getElementById('hpBarFill').style.width = hpPercent + '%';
+
+        const expPercent = (this.player.exp / this.player.maxExp) * 100;
+        document.getElementById('expBarFill').style.width = expPercent + '%';
+    }
+
+    updateInventoryUI() {
+        const container = document.getElementById('inventoryItems');
+        container.innerHTML = '';
+
+        if (this.inventory.length === 0) {
+            container.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">背包是空的</div>';
+            return;
+        }
+
+        this.inventory.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'inventoryItem';
+            div.innerHTML = `
+                <div class="itemIcon">💊</div>
+                <div>${item.name}</div>
+            `;
+            div.onclick = () => {
+                this.useItem(item);
+                this.closeInventory();
+            };
+            container.appendChild(div);
+        });
+    }
+
+    showInventory() {
+        this.updateInventoryUI();
+        document.getElementById('inventoryWindow').classList.add('visible');
+    }
+
+    closeInventory() {
+        document.getElementById('inventoryWindow').classList.remove('visible');
+    }
+
+    addMessage(text, type = 'normal') {
+        const log = document.getElementById('messageLog');
+        const msg = document.createElement('div');
+        msg.className = 'message ' + type;
+        msg.textContent = text;
+        log.appendChild(msg);
+
+        while (log.children.length > 5) {
+            log.removeChild(log.firstChild);
+        }
+
+        setTimeout(() => {
+            if (msg.parentNode) {
+                msg.style.opacity = '0.5';
+            }
+        }, 3000);
+    }
+
+    setupControls() {
+        document.addEventListener('keydown', (e) => {
+            if (!this.player.isAlive()) return;
+
+            const key = e.key.toLowerCase();
+            let moved = false;
+
+            if (key === 'w' || key === 'arrowup') moved = this.movePlayer(0, -1);
+            else if (key === 's' || key === 'arrowdown') moved = this.movePlayer(0, 1);
+            else if (key === 'a' || key === 'arrowleft') moved = this.movePlayer(-1, 0);
+            else if (key === 'd' || key === 'arrowright') moved = this.movePlayer(1, 0);
+            else if (key === 'q') moved = this.movePlayer(-1, -1);
+            else if (key === 'e') moved = this.movePlayer(1, -1);
+            else if (key === 'z') moved = this.movePlayer(-1, 1);
+            else if (key === 'c') moved = this.movePlayer(1, 1);
+            else if (key === ' ') {
+                this.endTurn();
+                moved = true;
+            }
+            else if (key === 'i') {
+                this.showInventory();
+            }
+            else if (key === '1' && this.quickSlot1) {
+                this.useItem(this.quickSlot1);
+            }
+            else if (key === '2' && this.quickSlot2) {
+                this.useItem(this.quickSlot2);
+            }
+
+            if (moved) {
+                e.preventDefault();
+            }
+        });
+
+        document.getElementById('btnWait').onclick = () => {
+            this.endTurn();
+        };
+
+        document.getElementById('btnSearch').onclick = () => {
+            this.addMessage('你仔细搜索了周围...');
+            this.endTurn();
+        };
+
+        document.getElementById('btnInfo').onclick = () => {
+            this.addMessage('点击地图上的位置来检查...');
+        };
+
+        document.getElementById('btnInventory').onclick = () => {
+            this.showInventory();
+        };
+
+        document.getElementById('inventoryClose').onclick = () => {
+            this.closeInventory();
+        };
+
+        document.getElementById('btnQuick1').onclick = () => {
+            if (this.quickSlot1) {
+                this.useItem(this.quickSlot1);
+            }
+        };
+
+        document.getElementById('btnQuick2').onclick = () => {
+            if (this.quickSlot2) {
+                this.useItem(this.quickSlot2);
+            }
+        };
+
+        document.getElementById('menuButton').onclick = () => {
+            const msg = '像素地牢 V4\n\n完整还原版\n\n使用 WASD/方向键 移动\nQEZC 对角线移动\n空格 等待\nI 背包\n1/2 快捷栏';
+            alert(msg);
+        };
+    }
+
+    gameLoop() {
+        this.renderer.render(this.map, this.player, this.monsters, this.items);
+        requestAnimationFrame(() => this.gameLoop());
+    }
+}
+
+// ============================================================================
+// 启动游戏
+// ============================================================================
+let game;
+window.onload = () => {
+    game = new Game();
+};
+    </script>
+</body>
+</html>
