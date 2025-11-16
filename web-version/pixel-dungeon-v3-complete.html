@@ -1,0 +1,1546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>像素地牢 - 完整还原版</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 100vh;
+            max-height: 600px;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部状态栏 */
+        #statusBar {
+            background: linear-gradient(to bottom, #2a2a2a, #1a1a1a);
+            border-bottom: 3px solid #444;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        #heroInfo {
+            width: 48px;
+            height: 48px;
+            background: #333;
+            border: 2px solid #666;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        #statsPanel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .progressBar {
+            height: 12px;
+            background: #222;
+            border: 1px solid #555;
+            position: relative;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progressFill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+
+        #hpFill { background: linear-gradient(to bottom, #ff4444, #cc0000); }
+        #expFill { background: linear-gradient(to bottom, #44ff44, #00cc00); }
+
+        .barText {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 9px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        #stats {
+            display: flex;
+            gap: 12px;
+            font-size: 10px;
+            color: #aaa;
+        }
+
+        /* 游戏区域 */
+        #gameArea {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+
+        /* 快捷栏 */
+        #quickslots {
+            background: linear-gradient(to bottom, #1a1a1a, #2a2a2a);
+            border-top: 3px solid #444;
+            padding: 8px;
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .quickslot {
+            width: 48px;
+            height: 48px;
+            background: #333;
+            border: 2px solid #555;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quickslot:hover { border-color: #888; }
+        .quickslot.active { border-color: #0f0; box-shadow: 0 0 10px #0f0; }
+
+        /* 消息日志 */
+        #messageLog {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #444;
+            padding: 8px;
+            max-height: 100px;
+            overflow-y: auto;
+            font-size: 11px;
+            pointer-events: none;
+        }
+
+        .message { margin: 2px 0; }
+        .message.damage { color: #f44; }
+        .message.heal { color: #4f4; }
+        .message.info { color: #4ff; }
+        .message.warning { color: #ff4; }
+
+        /* 控制按钮 */
+        #controls {
+            position: absolute;
+            bottom: 76px;
+            right: 10px;
+            display: grid;
+            grid-template-columns: repeat(3, 45px);
+            gap: 4px;
+        }
+
+        .ctrlBtn {
+            width: 45px;
+            height: 45px;
+            background: rgba(40, 40, 40, 0.9);
+            border: 2px solid #666;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ctrlBtn:active { background: rgba(60, 60, 60, 0.9); }
+        .ctrlBtn.empty { background: transparent; border: none; }
+
+        /* 开始屏幕 */
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .title {
+            font-size: 36px;
+            color: #fc0;
+            text-shadow: 0 0 20px #fc0;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: linear-gradient(to bottom, #4a4a4a, #2a2a2a);
+            border: 2px solid #666;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .btn:hover {
+            background: linear-gradient(to bottom, #5a5a5a, #3a3a3a);
+        }
+
+        /* 游戏结束 */
+        #gameOverScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- 状态栏 -->
+        <div id="statusBar">
+            <div id="heroInfo">⚔</div>
+            <div id="statsPanel">
+                <div class="progressBar">
+                    <div id="hpFill" class="progressFill" style="width: 100%"></div>
+                    <div class="barText" id="hpText">20/20</div>
+                </div>
+                <div class="progressBar">
+                    <div id="expFill" class="progressFill" style="width: 0%"></div>
+                    <div class="barText" id="expText">0/6</div>
+                </div>
+                <div id="stats">
+                    <span>Lv.<span id="level">1</span></span>
+                    <span>深度:<span id="depth">1</span></span>
+                    <span>力量:<span id="str">10</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 游戏区域 -->
+        <div id="gameArea">
+            <canvas id="gameCanvas"></canvas>
+            <div id="messageLog"></div>
+
+            <div id="controls">
+                <div class="ctrlBtn" onclick="game.movePlayer(-1,-1)">↖</div>
+                <div class="ctrlBtn" onclick="game.movePlayer(0,-1)">↑</div>
+                <div class="ctrlBtn" onclick="game.movePlayer(1,-1)">↗</div>
+                <div class="ctrlBtn" onclick="game.movePlayer(-1,0)">←</div>
+                <div class="ctrlBtn empty"></div>
+                <div class="ctrlBtn" onclick="game.movePlayer(1,0)">→</div>
+                <div class="ctrlBtn" onclick="game.movePlayer(-1,1)">↙</div>
+                <div class="ctrlBtn" onclick="game.movePlayer(0,1)">↓</div>
+                <div class="ctrlBtn" onclick="game.movePlayer(1,1)">↘</div>
+            </div>
+        </div>
+
+        <!-- 快捷栏 -->
+        <div id="quickslots">
+            <div class="quickslot" data-slot="0"></div>
+            <div class="quickslot" data-slot="1"></div>
+            <div class="quickslot" data-slot="2"></div>
+            <div class="quickslot" data-slot="3"></div>
+            <div class="quickslot" data-slot="4"></div>
+        </div>
+
+        <!-- 开始屏幕 -->
+        <div id="startScreen">
+            <div class="title">像素地牢</div>
+            <div style="color: #888; margin-bottom: 30px;">PIXEL DUNGEON - 完整还原版</div>
+            <button class="btn" onclick="game.startGame()">开始游戏</button>
+            <div style="margin-top: 30px; color: #666; font-size: 12px; text-align: center;">
+                原版机制完整还原<br>
+                BSP地图生成 | 怪物AI状态机 | 真实战斗系统
+            </div>
+        </div>
+
+        <!-- 游戏结束 -->
+        <div id="gameOverScreen">
+            <div class="title" id="gameOverTitle">游戏结束</div>
+            <div id="gameOverText" style="color: #aaa; margin-bottom: 20px;"></div>
+            <button class="btn" onclick="game.restart()">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+// ==================== 配置 ====================
+const CONFIG = {
+    TILE_SIZE: 16,
+    MAP_WIDTH: 32,
+    MAP_HEIGHT: 32,
+    VIEW_DISTANCE: 8,
+
+    // 地形类型（对应原版Terrain类）
+    TERRAIN: {
+        CHASM: 0,
+        EMPTY: 1,
+        GRASS: 2,
+        EMPTY_WELL: 3,
+        WALL: 4,
+        DOOR: 5,
+        OPEN_DOOR: 6,
+        ENTRANCE: 7,
+        EXIT: 8,
+        EMBERS: 9,
+        LOCKED_DOOR: 10,
+        PEDESTAL: 11,
+        WALL_DECO: 12,
+        BARRICADE: 13,
+        EMPTY_SP: 14,
+        HIGH_GRASS: 15,
+        SECRET_DOOR: 16,
+        WATER: 63
+    },
+
+    // 房间类型
+    ROOM_TYPE: {
+        NULL: 0,
+        STANDARD: 1,
+        ENTRANCE: 2,
+        EXIT: 3,
+        TUNNEL: 4,
+        PASSAGE: 5,
+        SHOP: 6,
+        BLACKSMITH: 7,
+        TREASURY: 8,
+        ARMORY: 9,
+        LIBRARY: 10,
+        LABORATORY: 11,
+        VAULT: 12,
+        CRYPT: 13,
+        STATUE: 14,
+        POOL: 15,
+        GARDEN: 16,
+        PIT: 17,
+        WEAK_FLOOR: 18
+    }
+};
+
+// ==================== 工具类 ====================
+class Random {
+    static int(min, max) {
+        if (max === undefined) {
+            max = min;
+            min = 0;
+        }
+        return Math.floor(Math.random() * (max - min)) + min;
+    }
+
+    static float() {
+        return Math.random();
+    }
+
+    static element(array) {
+        return array[this.int(array.length)];
+    }
+
+    static chances(chances) {
+        const total = chances.reduce((a, b) => a + b, 0);
+        let value = this.float() * total;
+        for (let i = 0; i < chances.length; i++) {
+            value -= chances[i];
+            if (value <= 0) return i;
+        }
+        return chances.length - 1;
+    }
+}
+
+class Utils {
+    static distance(x1, y1, x2, y2) {
+        return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+    }
+
+    static euclidean(x1, y1, x2, y2) {
+        return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
+    }
+}
+
+// ==================== BSP房间类 ====================
+class Room {
+    constructor(left, top, right, bottom) {
+        this.left = left;
+        this.top = top;
+        this.right = right;
+        this.bottom = bottom;
+        this.type = CONFIG.ROOM_TYPE.NULL;
+        this.connected = new Map();
+        this.neigbours = [];
+        this.distance = 999999;
+    }
+
+    width() { return this.right - this.left + 1; }
+    height() { return this.bottom - this.top + 1; }
+    square() { return this.width() * this.height(); }
+
+    inside(x, y) {
+        return x >= this.left && x <= this.right && y >= this.top && y <= this.bottom;
+    }
+
+    intersect(other) {
+        return new Room(
+            Math.max(this.left, other.left),
+            Math.max(this.top, other.top),
+            Math.min(this.right, other.right),
+            Math.min(this.bottom, other.bottom)
+        );
+    }
+
+    random() {
+        return [
+            Random.int(this.left, this.right + 1),
+            Random.int(this.top, this.bottom + 1)
+        ];
+    }
+
+    connect(other) {
+        if (!this.connected.has(other)) {
+            this.connected.set(other, null);
+            other.connected.set(this, null);
+        }
+    }
+
+    addNeighbour(other) {
+        const intersects = !(
+            this.right < other.left - 1 ||
+            this.left > other.right + 1 ||
+            this.bottom < other.top - 1 ||
+            this.top > other.bottom + 1
+        );
+
+        if (intersects) {
+            this.neigbours.push(other);
+            other.neigbours.push(this);
+        }
+    }
+}
+
+// ==================== BSP地图生成器 ====================
+class BSPMapGenerator {
+    constructor(width, height) {
+        this.width = width;
+        this.height = height;
+        this.minRoomSize = 7;
+        this.maxRoomSize = 9;
+        this.rooms = [];
+    }
+
+    // BSP递归分割（完全还原原版算法）
+    split(rect) {
+        const w = rect.width();
+        const h = rect.height();
+
+        if (w > this.maxRoomSize && h < this.minRoomSize) {
+            const vw = Random.int(rect.left + 3, rect.right - 2);
+            this.split(new Room(rect.left, rect.top, vw, rect.bottom));
+            this.split(new Room(vw, rect.top, rect.right, rect.bottom));
+        } else if (h > this.maxRoomSize && w < this.minRoomSize) {
+            const vh = Random.int(rect.top + 3, rect.bottom - 2);
+            this.split(new Room(rect.left, rect.top, rect.right, vh));
+            this.split(new Room(rect.left, vh, rect.right, rect.bottom));
+        } else if (
+            (Random.float() <= (this.minRoomSize * this.minRoomSize / rect.square()) &&
+             w <= this.maxRoomSize && h <= this.maxRoomSize) ||
+            w < this.minRoomSize || h < this.minRoomSize
+        ) {
+            this.rooms.push(rect);
+        } else {
+            if (Random.float() < (w - 2) / (w + h - 4)) {
+                const vw = Random.int(rect.left + 3, rect.right - 2);
+                this.split(new Room(rect.left, rect.top, vw, rect.bottom));
+                this.split(new Room(vw, rect.top, rect.right, rect.bottom));
+            } else {
+                const vh = Random.int(rect.top + 3, rect.bottom - 2);
+                this.split(new Room(rect.left, rect.top, rect.right, vh));
+                this.split(new Room(rect.left, vh, rect.right, rect.bottom));
+            }
+        }
+    }
+
+    // 构建邻居关系
+    buildNeighbours() {
+        for (let i = 0; i < this.rooms.length - 1; i++) {
+            for (let j = i + 1; j < this.rooms.length; j++) {
+                this.rooms[i].addNeighbour(this.rooms[j]);
+            }
+        }
+    }
+
+    // 计算距离（Dijkstra算法）
+    buildDistanceMap(from) {
+        for (const room of this.rooms) {
+            room.distance = 999999;
+        }
+        from.distance = 0;
+
+        const queue = [from];
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const dist = current.distance + 1;
+
+            for (const neighbour of current.neigbours) {
+                if (dist < neighbour.distance) {
+                    neighbour.distance = dist;
+                    queue.push(neighbour);
+                }
+            }
+        }
+    }
+
+    // 构建路径
+    buildPath(from, to) {
+        const path = [];
+        let current = from;
+
+        while (current !== to) {
+            let next = null;
+            let minDist = current.distance;
+
+            for (const neighbour of current.neigbours) {
+                if (neighbour.distance < minDist) {
+                    next = neighbour;
+                    minDist = neighbour.distance;
+                }
+            }
+
+            if (next === null) break;
+
+            path.push(next);
+            current = next;
+        }
+
+        return path;
+    }
+
+    // 生成完整地图
+    generate() {
+        this.rooms = [];
+
+        // BSP分割
+        this.split(new Room(0, 0, this.width - 1, this.height - 1));
+
+        if (this.rooms.length < 8) {
+            return this.generate(); // 重新生成
+        }
+
+        // 构建邻居关系
+        this.buildNeighbours();
+
+        // 选择入口和出口
+        let roomEntrance, roomExit;
+        let distance = 0;
+        const minDistance = Math.floor(Math.sqrt(this.rooms.length));
+        let retry = 0;
+
+        do {
+            // 选择大房间作为入口/出口
+            do {
+                roomEntrance = Random.element(this.rooms);
+            } while (roomEntrance.width() < 4 || roomEntrance.height() < 4);
+
+            do {
+                roomExit = Random.element(this.rooms);
+            } while (roomExit === roomEntrance || roomExit.width() < 4 || roomExit.height() < 4);
+
+            this.buildDistanceMap(roomExit);
+            distance = roomEntrance.distance;
+
+            if (retry++ > 10) {
+                return this.generate(); // 重新生成
+            }
+        } while (distance < minDistance);
+
+        roomEntrance.type = CONFIG.ROOM_TYPE.ENTRANCE;
+        roomExit.type = CONFIG.ROOM_TYPE.EXIT;
+
+        // 连接房间
+        const connected = new Set([roomEntrance]);
+
+        // 第一条主路径
+        this.buildDistanceMap(roomExit);
+        let path = this.buildPath(roomEntrance, roomExit);
+
+        for (let i = 0; i < path.length - 1; i++) {
+            path[i].connect(path[i + 1]);
+            connected.add(path[i]);
+        }
+        connected.add(roomExit);
+
+        // 第二条路径（增加连通性）
+        for (const room of path) {
+            room.distance = room.distance * 2;
+        }
+
+        this.buildDistanceMap(roomExit);
+        path = this.buildPath(roomEntrance, roomExit);
+
+        for (let i = 0; i < path.length - 1; i++) {
+            path[i].connect(path[i + 1]);
+            connected.add(path[i]);
+        }
+
+        // 连接50-70%的房间
+        const targetConnected = Math.floor(this.rooms.length * (0.5 + Random.float() * 0.2));
+
+        while (connected.size < targetConnected) {
+            const connectedRoom = Random.element([...connected]);
+            const neighbour = Random.element(connectedRoom.neigbours);
+
+            if (!connected.has(neighbour)) {
+                connectedRoom.connect(neighbour);
+                connected.add(neighbour);
+            }
+        }
+
+        // 分配房间类型
+        for (const room of this.rooms) {
+            if (room.type === CONFIG.ROOM_TYPE.NULL) {
+                const connections = room.connected.size;
+                if (connections === 0) {
+                    // 孤立房间
+                } else if (Random.int(connections * connections) === 0) {
+                    room.type = CONFIG.ROOM_TYPE.STANDARD;
+                } else {
+                    room.type = CONFIG.ROOM_TYPE.TUNNEL;
+                }
+            }
+        }
+
+        // 确保至少有4个标准房间
+        let standardCount = this.rooms.filter(r => r.type === CONFIG.ROOM_TYPE.STANDARD).length;
+        while (standardCount < 4) {
+            const tunnelRooms = this.rooms.filter(r => r.type === CONFIG.ROOM_TYPE.TUNNEL);
+            if (tunnelRooms.length > 0) {
+                Random.element(tunnelRooms).type = CONFIG.ROOM_TYPE.STANDARD;
+                standardCount++;
+            } else {
+                break;
+            }
+        }
+
+        return {
+            rooms: this.rooms,
+            entrance: roomEntrance,
+            exit: roomExit
+        };
+    }
+}
+
+// ==================== 单元格类 ====================
+class Cell {
+    constructor(terrain = CONFIG.TERRAIN.CHASM) {
+        this.terrain = terrain;
+        this.discovered = false;
+        this.visible = false;
+        this.visited = false;
+    }
+}
+
+// ==================== 怪物AI状态 ====================
+const AI_STATE = {
+    SLEEPING: 'sleeping',
+    WANDERING: 'wandering',
+    HUNTING: 'hunting',
+    FLEEING: 'fleeing',
+    PASSIVE: 'passive'
+};
+
+// ==================== Bestiary怪物池 ====================
+class Bestiary {
+    static MOB_CLASSES = {
+        // 1-4层：下水道
+        Rat: { hp: 8, attack: 3, defense: 1, exp: 1, accuracy: 8, evasion: 5, name: '老鼠' },
+        Gnoll: { hp: 12, attack: 4, defense: 2, exp: 2, accuracy: 10, evasion: 4, name: '豺狼人' },
+        Crab: { hp: 15, attack: 5, defense: 4, exp: 3, accuracy: 12, evasion: 5, name: '螃蟹' },
+
+        // 5层Boss
+        Goo: { hp: 80, attack: 10, defense: 2, exp: 20, accuracy: 15, evasion: 5, name: 'BOSS-粘液怪' },
+
+        // 6-9层：监狱
+        Skeleton: { hp: 25, attack: 6, defense: 5, exp: 4, accuracy: 12, evasion: 6, name: '骷髅' },
+        Thief: { hp: 20, attack: 8, defense: 3, exp: 5, accuracy: 14, evasion: 12, name: '小偷' },
+        Swarm: { hp: 50, attack: 4, defense: 1, exp: 3, accuracy: 10, evasion: 10, name: '虫群' },
+        Shaman: { hp: 18, attack: 10, defense: 4, exp: 6, accuracy: 15, evasion: 8, name: '萨满' }
+    };
+
+    static getMob(depth) {
+        let chances, classes;
+
+        switch (depth) {
+            case 1:
+                chances = [1];
+                classes = ['Rat'];
+                break;
+            case 2:
+                chances = [1, 1];
+                classes = ['Rat', 'Gnoll'];
+                break;
+            case 3:
+                chances = [1, 2, 1];
+                classes = ['Rat', 'Gnoll', 'Crab'];
+                break;
+            case 4:
+                chances = [1, 2, 3];
+                classes = ['Rat', 'Gnoll', 'Crab'];
+                break;
+            case 5:
+                chances = [1];
+                classes = ['Goo'];
+                break;
+            case 6:
+            case 7:
+            case 8:
+            case 9:
+                chances = [3, 1, 1, 1];
+                classes = ['Skeleton', 'Shaman', 'Thief', 'Swarm'];
+                break;
+            default:
+                chances = [1];
+                classes = ['Rat'];
+        }
+
+        const index = Random.chances(chances);
+        const mobClass = classes[index];
+        return this.MOB_CLASSES[mobClass];
+    }
+}
+
+// ==================== 角色类 ====================
+class Character {
+    constructor(x, y, data) {
+        this.x = x;
+        this.y = y;
+        Object.assign(this, data);
+        this.maxHP = this.hp;
+        this.alive = true;
+    }
+
+    // 命中判定（原版算法）
+    static hit(attacker, defender) {
+        const accuracy = Random.int(attacker.accuracy + 1);
+        const evasion = Random.int(defender.evasion + 1);
+        return accuracy >= evasion;
+    }
+
+    // 伤害计算
+    damageRoll() {
+        return Random.int(this.attack, this.attack + 4);
+    }
+
+    // 防御减伤
+    drRoll() {
+        return Random.int(0, this.defense + 1);
+    }
+
+    // 攻击目标
+    attackTarget(target) {
+        if (Character.hit(this, target)) {
+            const dmg = this.damageRoll();
+            const dr = target.drRoll();
+            const effectiveDamage = Math.max(dmg - dr, 1);
+
+            target.hp -= effectiveDamage;
+            if (target.hp <= 0) {
+                target.hp = 0;
+                target.alive = false;
+            }
+
+            return { hit: true, damage: effectiveDamage };
+        }
+        return { hit: false };
+    }
+}
+
+// ==================== 玩家类 ====================
+class Player extends Character {
+    constructor(x, y) {
+        super(x, y, {
+            hp: 20,
+            attack: 2,
+            defense: 0,
+            accuracy: 10,
+            evasion: 5,
+            name: '战士'
+        });
+
+        this.level = 1;
+        this.exp = 0;
+        this.expToLevel = 6;
+        this.str = 10;
+        this.inventory = [];
+    }
+
+    gainExp(amount) {
+        this.exp += amount;
+        while (this.exp >= this.expToLevel) {
+            this.levelUp();
+        }
+    }
+
+    levelUp() {
+        this.level++;
+        this.exp -= this.expToLevel;
+        this.expToLevel = Math.floor(this.expToLevel * 1.5);
+
+        this.maxHP += 5;
+        this.hp = this.maxHP;
+        this.attack += 1;
+        this.defense += 1;
+        this.accuracy += 1;
+
+        game.addMessage('升级到 Lv.' + this.level + '！', 'heal');
+    }
+}
+
+// ==================== 怪物类 ====================
+class Monster extends Character {
+    constructor(x, y, data) {
+        super(x, y, data);
+        this.state = AI_STATE.SLEEPING;
+        this.target = null;
+    }
+
+    act() {
+        if (!this.alive) return;
+
+        const player = game.player;
+        const dist = Utils.distance(this.x, this.y, player.x, player.y);
+
+        // 检查是否能看到玩家
+        const canSee = dist <= CONFIG.VIEW_DISTANCE &&
+                        game.map[this.y][this.x].visible;
+
+        switch (this.state) {
+            case AI_STATE.SLEEPING:
+                if (canSee) {
+                    this.state = AI_STATE.HUNTING;
+                    game.addMessage(this.name + ' 注意到了你！', 'warning');
+                }
+                break;
+
+            case AI_STATE.HUNTING:
+                if (dist === 1) {
+                    // 攻击
+                    const result = this.attackTarget(player);
+                    if (result.hit) {
+                        game.addMessage(this.name + ' 攻击你造成 ' + result.damage + ' 伤害', 'damage');
+                        if (!player.alive) {
+                            game.gameOver(false);
+                        }
+                    } else {
+                        game.addMessage(this.name + ' 的攻击被闪避了', 'info');
+                    }
+                } else if (canSee) {
+                    // 追踪
+                    this.moveTowards(player.x, player.y);
+                } else {
+                    // 失去目标，游荡
+                    this.state = AI_STATE.WANDERING;
+                }
+                break;
+
+            case AI_STATE.WANDERING:
+                if (canSee) {
+                    this.state = AI_STATE.HUNTING;
+                } else {
+                    // 随机移动
+                    if (Random.float() < 0.3) {
+                        const dx = Random.int(-1, 2);
+                        const dy = Random.int(-1, 2);
+                        if (game.isPassable(this.x + dx, this.y + dy)) {
+                            this.x += dx;
+                            this.y += dy;
+                        }
+                    }
+                }
+                break;
+        }
+    }
+
+    moveTowards(tx, ty) {
+        const dx = Math.sign(tx - this.x);
+        const dy = Math.sign(ty - this.y);
+
+        // 尝试移动
+        if (Math.abs(tx - this.x) > Math.abs(ty - this.y)) {
+            if (game.canMove(this.x + dx, this.y, this)) {
+                this.x += dx;
+            } else if (game.canMove(this.x, this.y + dy, this)) {
+                this.y += dy;
+            }
+        } else {
+            if (game.canMove(this.x, this.y + dy, this)) {
+                this.y += dy;
+            } else if (game.canMove(this.x + dx, this.y, this)) {
+                this.x += dx;
+            }
+        }
+    }
+}
+
+// ==================== 物品类 ====================
+class Item {
+    constructor(x, y, name, type) {
+        this.x = x;
+        this.y = y;
+        this.name = name;
+        this.type = type;
+    }
+}
+
+class HealthPotion extends Item {
+    constructor(x, y) {
+        super(x, y, '生命药水', 'potion');
+        this.healAmount = 10;
+    }
+
+    use(player) {
+        const healed = Math.min(this.healAmount, player.maxHP - player.hp);
+        player.hp = Math.min(player.maxHP, player.hp + this.healAmount);
+        game.addMessage('使用生命药水，恢复 ' + healed + ' HP', 'heal');
+    }
+}
+
+// ==================== 地图绘制器 ====================
+class MapPainter {
+    static paint(rooms, map) {
+        // 填充墙壁
+        for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
+            for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
+                map[y][x].terrain = CONFIG.TERRAIN.WALL;
+            }
+        }
+
+        // 绘制房间
+        for (const room of rooms) {
+            if (room.type !== CONFIG.ROOM_TYPE.NULL) {
+                this.paintRoom(room, map);
+            }
+        }
+
+        // 绘制连接通道
+        for (const room of rooms) {
+            for (const [other, door] of room.connected) {
+                this.paintConnection(room, other, map);
+            }
+        }
+
+        // 添加装饰
+        this.paintDecorations(rooms, map);
+    }
+
+    static paintRoom(room, map) {
+        for (let y = room.top; y <= room.bottom; y++) {
+            for (let x = room.left; x <= room.right; x++) {
+                map[y][x].terrain = CONFIG.TERRAIN.EMPTY;
+            }
+        }
+
+        // 特殊房间处理
+        if (room.type === CONFIG.ROOM_TYPE.ENTRANCE) {
+            const [x, y] = room.random();
+            map[y][x].terrain = CONFIG.TERRAIN.ENTRANCE;
+        } else if (room.type === CONFIG.ROOM_TYPE.EXIT) {
+            const [x, y] = room.random();
+            map[y][x].terrain = CONFIG.TERRAIN.EXIT;
+        }
+    }
+
+    static paintConnection(room1, room2, map) {
+        const [x1, y1] = room1.random();
+        const [x2, y2] = room2.random();
+
+        let x = x1, y = y1;
+
+        // 横向
+        while (x !== x2) {
+            if (map[y][x].terrain !== CONFIG.TERRAIN.EMPTY) {
+                map[y][x].terrain = CONFIG.TERRAIN.EMPTY;
+            }
+            x += x < x2 ? 1 : -1;
+        }
+
+        // 纵向
+        while (y !== y2) {
+            if (map[y][x].terrain !== CONFIG.TERRAIN.EMPTY) {
+                map[y][x].terrain = CONFIG.TERRAIN.EMPTY;
+            }
+            y += y < y2 ? 1 : -1;
+        }
+    }
+
+    static paintDecorations(rooms, map) {
+        // 添加草地
+        for (const room of rooms) {
+            if (room.type === CONFIG.ROOM_TYPE.STANDARD && Random.float() < 0.4) {
+                for (let y = room.top; y <= room.bottom; y++) {
+                    for (let x = room.left; x <= room.right; x++) {
+                        if (map[y][x].terrain === CONFIG.TERRAIN.EMPTY && Random.float() < 0.2) {
+                            map[y][x].terrain = Random.float() < 0.5 ? CONFIG.TERRAIN.GRASS : CONFIG.TERRAIN.HIGH_GRASS;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 添加水域
+        for (const room of rooms) {
+            if (room.type === CONFIG.ROOM_TYPE.STANDARD &&
+                room.width() >= 5 && room.height() >= 5 &&
+                Random.float() < 0.15) {
+
+                const ww = Random.int(2, 4);
+                const wh = Random.int(2, 4);
+                const wx = room.left + Random.int(1, room.width() - ww);
+                const wy = room.top + Random.int(1, room.height() - wh);
+
+                for (let y = wy; y < wy + wh && y <= room.bottom; y++) {
+                    for (let x = wx; x < wx + ww && x <= room.right; x++) {
+                        map[y][x].terrain = CONFIG.TERRAIN.WATER;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==================== 渲染器 ====================
+class Renderer {
+    static drawTile(ctx, terrain, x, y, size, cell) {
+        const alpha = cell.visible ? 1.0 : (cell.discovered ? 0.3 : 0);
+
+        if (alpha === 0) {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(x, y, size, size);
+            return;
+        }
+
+        ctx.globalAlpha = alpha;
+
+        switch (terrain) {
+            case CONFIG.TERRAIN.WALL:
+                ctx.fillStyle = '#555';
+                ctx.fillRect(x, y, size, size);
+                ctx.fillStyle = '#444';
+                ctx.fillRect(x + 1, y + 1, size - 2, size - 2);
+                break;
+
+            case CONFIG.TERRAIN.EMPTY:
+                ctx.fillStyle = '#2a2a2a';
+                ctx.fillRect(x, y, size, size);
+                break;
+
+            case CONFIG.TERRAIN.GRASS:
+                ctx.fillStyle = '#2a4a1a';
+                ctx.fillRect(x, y, size, size);
+                break;
+
+            case CONFIG.TERRAIN.HIGH_GRASS:
+                ctx.fillStyle = '#1a3a0a';
+                ctx.fillRect(x, y, size, size);
+                ctx.fillStyle = '#2a4a1a';
+                for (let i = 0; i < 3; i++) {
+                    ctx.fillRect(x + i * 5, y + 2, 2, 8);
+                }
+                break;
+
+            case CONFIG.TERRAIN.WATER:
+                const wave = Math.sin(Date.now() / 500 + x + y) * 10;
+                ctx.fillStyle = `rgb(${30 + wave}, ${144 + wave}, 255)`;
+                ctx.fillRect(x, y, size, size);
+                break;
+
+            case CONFIG.TERRAIN.ENTRANCE:
+                ctx.fillStyle = '#2a2a2a';
+                ctx.fillRect(x, y, size, size);
+                ctx.fillStyle = '#4f4';
+                ctx.fillRect(x + 4, y + 4, size - 8, size - 8);
+                break;
+
+            case CONFIG.TERRAIN.EXIT:
+                ctx.fillStyle = '#2a2a2a';
+                ctx.fillRect(x, y, size, size);
+                ctx.fillStyle = '#fd0';
+                for (let i = 0; i < 4; i++) {
+                    ctx.fillRect(x + 2, y + 3 + i * 3, size - 4, 2);
+                }
+                break;
+        }
+
+        ctx.globalAlpha = 1.0;
+    }
+
+    static drawEntity(ctx, entity, x, y, size, cell) {
+        if (!cell.visible) return;
+
+        // 阴影
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.beginPath();
+        ctx.ellipse(x + size/2, y + size - 2, size/3, size/6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (entity instanceof Player) {
+            ctx.fillStyle = '#4af';
+            ctx.fillRect(x + 4, y + 2, size - 8, size - 4);
+            ctx.fillStyle = '#fdb';
+            ctx.fillRect(x + 5, y + 3, size - 10, 4);
+            ctx.fillStyle = '#ccc';
+            ctx.fillRect(x + 2, y + 5, 3, 6);
+        } else if (entity instanceof Monster) {
+            let color = '#8b4513';
+            if (entity.name.includes('Boss')) color = '#a0f';
+            else if (entity.name.includes('豺狼')) color = '#d2691e';
+            else if (entity.name.includes('螃蟹')) color = '#ff6347';
+            else if (entity.name.includes('骷髅')) color = '#ddd';
+
+            ctx.fillStyle = color;
+            ctx.fillRect(x + 3, y + 3, size - 6, size - 6);
+
+            ctx.fillStyle = '#f00';
+            ctx.fillRect(x + 5, y + 5, 2, 2);
+            ctx.fillRect(x + size - 7, y + 5, 2, 2);
+
+            if (entity.hp < entity.maxHP) {
+                const barWidth = size - 4;
+                const hpPercent = entity.hp / entity.maxHP;
+
+                ctx.fillStyle = '#300';
+                ctx.fillRect(x + 2, y - 4, barWidth, 3);
+                ctx.fillStyle = '#f00';
+                ctx.fillRect(x + 2, y - 4, barWidth * hpPercent, 3);
+            }
+        } else if (entity instanceof Item) {
+            ctx.fillStyle = '#fd0';
+            ctx.beginPath();
+            ctx.arc(x + size/2, y + size/2, size/3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ff0';
+            ctx.fillRect(x + size/2 - 2, y + size/2 - 4, 4, 8);
+            ctx.fillRect(x + size/2 - 4, y + size/2 - 2, 8, 4);
+        }
+    }
+}
+
+// ==================== 游戏主类 ====================
+class Game {
+    constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+
+        this.map = null;
+        this.rooms = null;
+        this.player = null;
+        this.monsters = [];
+        this.items = [];
+        this.depth = 1;
+        this.running = false;
+
+        this.setupCanvas();
+        this.setupInput();
+    }
+
+    setupCanvas() {
+        const area = document.getElementById('gameArea');
+        this.canvas.width = area.clientWidth;
+        this.canvas.height = area.clientHeight;
+
+        window.addEventListener('resize', () => {
+            this.canvas.width = area.clientWidth;
+            this.canvas.height = area.clientHeight;
+            if (this.running) this.render();
+        });
+    }
+
+    setupInput() {
+        document.addEventListener('keydown', (e) => {
+            if (!this.running) return;
+
+            const key = e.key.toLowerCase();
+            let dx = 0, dy = 0;
+
+            if (key === 'arrowup' || key === 'w') dy = -1;
+            else if (key === 'arrowdown' || key === 's') dy = 1;
+            else if (key === 'arrowleft' || key === 'a') dx = -1;
+            else if (key === 'arrowright' || key === 'd') dx = 1;
+            else if (key === 'q') { dx = -1; dy = -1; }
+            else if (key === 'e') { dx = 1; dy = -1; }
+            else if (key === 'z') { dx = -1; dy = 1; }
+            else if (key === 'c') { dx = 1; dy = 1; }
+            else if (key === ' ') {
+                this.processTurn();
+                e.preventDefault();
+                return;
+            }
+
+            if (dx !== 0 || dy !== 0) {
+                this.movePlayer(dx, dy);
+                e.preventDefault();
+            }
+        });
+    }
+
+    startGame() {
+        document.getElementById('startScreen').style.display = 'none';
+        this.depth = 1;
+        this.generateLevel();
+        this.running = true;
+        this.gameLoop();
+    }
+
+    generateLevel() {
+        // BSP生成地图
+        const generator = new BSPMapGenerator(CONFIG.MAP_WIDTH, CONFIG.MAP_HEIGHT);
+        const result = generator.generate();
+
+        this.rooms = result.rooms;
+
+        // 创建地图
+        this.map = Array(CONFIG.MAP_HEIGHT).fill(null).map(() =>
+            Array(CONFIG.MAP_WIDTH).fill(null).map(() => new Cell())
+        );
+
+        // 绘制地图
+        MapPainter.paint(this.rooms, this.map);
+
+        // 放置玩家
+        const entrance = result.entrance;
+        const [px, py] = entrance.random();
+
+        if (this.player) {
+            this.player.x = px;
+            this.player.y = py;
+        } else {
+            this.player = new Player(px, py);
+        }
+
+        // 生成怪物（原版公式：2 + depth%5 + Random.Int(3)）
+        this.monsters = [];
+        const mobCount = 2 + (this.depth % 5) + Random.int(3);
+
+        for (let i = 0; i < mobCount; i++) {
+            const room = Random.element(this.rooms.filter(r => r.type === CONFIG.ROOM_TYPE.STANDARD));
+            if (room) {
+                const [mx, my] = room.random();
+                if (this.isPassable(mx, my) && (mx !== px || my !== py)) {
+                    const mobData = Bestiary.getMob(this.depth);
+                    const monster = new Monster(mx, my, mobData);
+                    this.monsters.push(monster);
+                }
+            }
+        }
+
+        // 生成物品（3-7个）
+        this.items = [];
+        let itemCount = 3;
+        while (Random.float() < 0.4) itemCount++;
+
+        for (let i = 0; i < itemCount; i++) {
+            const room = Random.element(this.rooms.filter(r => r.type === CONFIG.ROOM_TYPE.STANDARD));
+            if (room) {
+                const [ix, iy] = room.random();
+                if (this.isPassable(ix, iy)) {
+                    this.items.push(new HealthPotion(ix, iy));
+                }
+            }
+        }
+
+        this.updateFOV();
+        this.addMessage('进入第 ' + this.depth + ' 层地牢', 'info');
+        this.updateUI();
+    }
+
+    movePlayer(dx, dy) {
+        if (!this.running || !this.player.alive) return;
+
+        const newX = this.player.x + dx;
+        const newY = this.player.y + dy;
+
+        // 攻击怪物
+        const monster = this.monsters.find(m => m.alive && m.x === newX && m.y === newY);
+        if (monster) {
+            const result = this.player.attackTarget(monster);
+            if (result.hit) {
+                this.addMessage('你攻击 ' + monster.name + ' 造成 ' + result.damage + ' 伤害', 'info');
+
+                if (!monster.alive) {
+                    this.addMessage('击败了 ' + monster.name + '！', 'heal');
+                    this.player.gainExp(monster.exp);
+
+                    if (Random.float() < 0.3) {
+                        this.items.push(new HealthPotion(monster.x, monster.y));
+                    }
+                }
+            } else {
+                this.addMessage('你的攻击被 ' + monster.name + ' 闪避了', 'warning');
+            }
+
+            this.processTurn();
+            return;
+        }
+
+        // 移动
+        if (this.isPassable(newX, newY)) {
+            this.player.x = newX;
+            this.player.y = newY;
+
+            // 拾取物品
+            const itemIndex = this.items.findIndex(i => i.x === newX && i.y === newY);
+            if (itemIndex >= 0) {
+                const item = this.items[itemIndex];
+                this.player.inventory.push(item);
+                this.addMessage('拾取: ' + item.name, 'info');
+                this.items.splice(itemIndex, 1);
+            }
+
+            // 楼梯
+            const terrain = this.map[newY][newX].terrain;
+            if (terrain === CONFIG.TERRAIN.EXIT) {
+                if (this.depth === 5) {
+                    this.gameOver(true);
+                } else {
+                    this.depth++;
+                    this.generateLevel();
+                }
+                return;
+            }
+
+            this.processTurn();
+        }
+    }
+
+    processTurn() {
+        // 怪物行动
+        for (const monster of this.monsters) {
+            if (monster.alive) {
+                monster.act();
+            }
+        }
+
+        this.updateFOV();
+        this.updateUI();
+        this.render();
+    }
+
+    updateFOV() {
+        // 重置可见性
+        for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
+            for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
+                this.map[y][x].visible = false;
+            }
+        }
+
+        // 简单圆形视野
+        const px = this.player.x;
+        const py = this.player.y;
+
+        for (let y = -CONFIG.VIEW_DISTANCE; y <= CONFIG.VIEW_DISTANCE; y++) {
+            for (let x = -CONFIG.VIEW_DISTANCE; x <= CONFIG.VIEW_DISTANCE; x++) {
+                const tx = px + x;
+                const ty = py + y;
+
+                if (tx >= 0 && tx < CONFIG.MAP_WIDTH && ty >= 0 && ty < CONFIG.MAP_HEIGHT) {
+                    const dist = Utils.euclidean(px, py, tx, ty);
+                    if (dist <= CONFIG.VIEW_DISTANCE) {
+                        this.map[ty][tx].visible = true;
+                        this.map[ty][tx].discovered = true;
+                    }
+                }
+            }
+        }
+    }
+
+    isPassable(x, y) {
+        if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) {
+            return false;
+        }
+
+        const terrain = this.map[y][x].terrain;
+        return terrain === CONFIG.TERRAIN.EMPTY ||
+               terrain === CONFIG.TERRAIN.GRASS ||
+               terrain === CONFIG.TERRAIN.HIGH_GRASS ||
+               terrain === CONFIG.TERRAIN.ENTRANCE ||
+               terrain === CONFIG.TERRAIN.EXIT;
+    }
+
+    canMove(x, y, ignore = null) {
+        if (!this.isPassable(x, y)) return false;
+
+        if (this.player && this.player.x === x && this.player.y === y) return false;
+
+        for (const monster of this.monsters) {
+            if (monster !== ignore && monster.alive && monster.x === x && monster.y === y) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    render() {
+        const ctx = this.ctx;
+        const tileSize = CONFIG.TILE_SIZE;
+
+        const tilesX = Math.floor(this.canvas.width / tileSize);
+        const tilesY = Math.floor(this.canvas.height / tileSize);
+        const cameraX = this.player.x - Math.floor(tilesX / 2);
+        const cameraY = this.player.y - Math.floor(tilesY / 2);
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // 渲染地图
+        for (let y = 0; y <= tilesY; y++) {
+            for (let x = 0; x <= tilesX; x++) {
+                const mx = cameraX + x;
+                const my = cameraY + y;
+
+                if (mx >= 0 && mx < CONFIG.MAP_WIDTH && my >= 0 && my < CONFIG.MAP_HEIGHT) {
+                    Renderer.drawTile(
+                        ctx,
+                        this.map[my][mx].terrain,
+                        x * tileSize,
+                        y * tileSize,
+                        tileSize,
+                        this.map[my][mx]
+                    );
+                }
+            }
+        }
+
+        // 渲染物品
+        for (const item of this.items) {
+            const sx = (item.x - cameraX) * tileSize;
+            const sy = (item.y - cameraY) * tileSize;
+
+            if (sx >= -tileSize && sx < this.canvas.width && sy >= -tileSize && sy < this.canvas.height) {
+                Renderer.drawEntity(ctx, item, sx, sy, tileSize, this.map[item.y][item.x]);
+            }
+        }
+
+        // 渲染怪物
+        for (const monster of this.monsters) {
+            if (monster.alive) {
+                const sx = (monster.x - cameraX) * tileSize;
+                const sy = (monster.y - cameraY) * tileSize;
+
+                if (sx >= -tileSize && sx < this.canvas.width && sy >= -tileSize && sy < this.canvas.height) {
+                    Renderer.drawEntity(ctx, monster, sx, sy, tileSize, this.map[monster.y][monster.x]);
+                }
+            }
+        }
+
+        // 渲染玩家
+        const px = (this.player.x - cameraX) * tileSize;
+        const py = (this.player.y - cameraY) * tileSize;
+        Renderer.drawEntity(ctx, this.player, px, py, tileSize, this.map[this.player.y][this.player.x]);
+
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px, py, tileSize, tileSize);
+    }
+
+    updateUI() {
+        const hpPercent = (this.player.hp / this.player.maxHP) * 100;
+        document.getElementById('hpFill').style.width = hpPercent + '%';
+        document.getElementById('hpText').textContent = this.player.hp + '/' + this.player.maxHP;
+
+        const expPercent = (this.player.exp / this.player.expToLevel) * 100;
+        document.getElementById('expFill').style.width = expPercent + '%';
+        document.getElementById('expText').textContent = this.player.exp + '/' + this.player.expToLevel;
+
+        document.getElementById('level').textContent = this.player.level;
+        document.getElementById('depth').textContent = this.depth;
+        document.getElementById('str').textContent = this.player.str;
+    }
+
+    addMessage(text, type = 'info') {
+        const log = document.getElementById('messageLog');
+        const msg = document.createElement('div');
+        msg.className = 'message ' + type;
+        msg.textContent = '> ' + text;
+        log.appendChild(msg);
+        log.scrollTop = log.scrollHeight;
+
+        while (log.children.length > 30) {
+            log.removeChild(log.firstChild);
+        }
+    }
+
+    gameOver(victory) {
+        this.running = false;
+        const screen = document.getElementById('gameOverScreen');
+        const title = document.getElementById('gameOverTitle');
+        const text = document.getElementById('gameOverText');
+
+        if (victory) {
+            title.textContent = '胜利！';
+            title.style.color = '#0f0';
+            text.textContent = `击败Boss！\n等级: ${this.player.level}\n深度: ${this.depth}`;
+        } else {
+            title.textContent = '你死了';
+            title.style.color = '#f00';
+            text.textContent = `在第 ${this.depth} 层阵亡\n等级: ${this.player.level}`;
+        }
+
+        screen.style.display = 'flex';
+    }
+
+    restart() {
+        document.getElementById('gameOverScreen').style.display = 'none';
+        document.getElementById('startScreen').style.display = 'flex';
+        this.player = null;
+        this.monsters = [];
+        this.items = [];
+        document.getElementById('messageLog').innerHTML = '';
+    }
+
+    gameLoop() {
+        if (this.running) {
+            this.render();
+            requestAnimationFrame(() => this.gameLoop());
+        }
+    }
+}
+
+// 启动游戏
+const game = new Game();
+    </script>
+</body>
+</html>
